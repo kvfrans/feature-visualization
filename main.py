@@ -77,3 +77,43 @@ def train():
     correct_prediction = tf.equal(tf.argmax(guesses,1), tf.argmax(lbl,1));
     # represent the correctness as a float [1,1,0,1] -> 0.75
     accuracy = tf.reduce_mean(tf.cast(correct_prediction, "float"));
+
+
+    sess.run(tf.initialize_all_variables());
+
+    batch = unpickle("cifar-10-batches-py/data_batch_1")
+
+    validationData = batch["data"][555:batchsize+555]
+    validationRawLabel = batch["labels"][555:batchsize+555]
+    validationLabel = np.zeros((batchsize,10))
+    validationLabel[np.arange(batchsize),validationRawLabel] = 1
+    validationData = tnpimg/255.0
+
+    saver = tf.train.Saver()
+    saver.restore(sess, tf.train.latest_checkpoint("/Users/kevin/Documents/Python/taco/training/"))
+
+    # train for 20000
+    mnistbatch = mnist.train.next_batch(batchsize)
+    # print mnistbatch[0].shape
+    for i in range(20000):
+        randomint = randint(0,10000 - batchsize - 1)
+        trainingData = batch["data"][randomint:batchsize+randomint]
+        rawlabel = batch["labels"][randomint:batchsize+randomint]
+        trainingLabel = np.zeros((batchsize,10))
+        trainingLabel[np.arange(batchsize),rawlabel] = 1
+        trainingData = trainingData/255.0
+
+        if i%10 == 0:
+            train_accuracy = accuracy.eval(feed_dict={
+            img: validationData, lbl: validationLabel, keepProb: 1.0})
+            print("step %d, training accuracy %g"%(i, train_accuracy))
+
+            if i%50 == 0:
+                saver.save(sess, FLAGS.train_dir, global_step=i)
+
+        optimizer.run(feed_dict={img: trainingData, lbl: trainingLabel, keepProb: 0.5})
+        print i
+
+
+def main(argv=None):
+    train()
