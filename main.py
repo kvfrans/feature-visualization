@@ -1,11 +1,15 @@
 import tensorflow as tf
 import numpy as np
+import cPickle
 from tensorflow.python.platform import gfile
+from random import randint
+import os
 
-FLAGS = tf.app.flags.FLAGS
-tf.app.flags.DEFINE_string('train_dir', '/Users/kevin/Documents/Python/feature-visualization/training/train',
-                           """Directory where to write event logs """
-                           """and checkpoint.""")
+def unpickle(file):
+  fo = open(file, 'rb')
+  dict = cPickle.load(fo)
+  fo.close()
+  return dict
 
 def initWeight(shape):
     weights = tf.truncated_normal(shape,stddev=0.1)
@@ -87,13 +91,12 @@ def train():
     validationRawLabel = batch["labels"][555:batchsize+555]
     validationLabel = np.zeros((batchsize,10))
     validationLabel[np.arange(batchsize),validationRawLabel] = 1
-    validationData = tnpimg/255.0
+    validationData = validationData/255.0
 
     saver = tf.train.Saver()
-    saver.restore(sess, tf.train.latest_checkpoint("/Users/kevin/Documents/Python/taco/training/"))
+    # saver.restore(sess, tf.train.latest_checkpoint("/Users/kevin/Documents/Python/taco/training/"))
 
     # train for 20000
-    mnistbatch = mnist.train.next_batch(batchsize)
     # print mnistbatch[0].shape
     for i in range(20000):
         randomint = randint(0,10000 - batchsize - 1)
@@ -109,7 +112,7 @@ def train():
             print("step %d, training accuracy %g"%(i, train_accuracy))
 
             if i%50 == 0:
-                saver.save(sess, FLAGS.train_dir, global_step=i)
+                saver.save(sess, os.getcwd()+"/training/train", global_step=i)
 
         optimizer.run(feed_dict={img: trainingData, lbl: trainingLabel, keepProb: 0.5})
         print i
@@ -117,3 +120,6 @@ def train():
 
 def main(argv=None):
     train()
+
+if __name__ == '__main__':
+    tf.app.run()
