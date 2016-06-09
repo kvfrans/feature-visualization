@@ -3,9 +3,6 @@
 
 ##Instructions for running:
 
-Create a /training directory
-
-Download the cifar10 binary format, place into /cifar-10-batches-py directory
-https://www.cs.toronto.edu/~kriz/cifar.html
+Download the (cifar10 binary format)[https://www.cs.toronto.edu/~kriz/cifar.html], place into /cifar-10-batches-py directory
 
 run main.py
