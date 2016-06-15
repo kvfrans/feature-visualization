@@ -119,12 +119,113 @@ def train():
         optimizer.run(feed_dict={img: trainingData, lbl: trainingLabel, keepProb: 0.5})
         print i
 
+def unpool(value, name='unpool'):
+    """N-dimensional version of the unpooling operation from
+    https://www.robots.ox.ac.uk/~vgg/rg/papers/Dosovitskiy_Learning_to_Generate_2015_CVPR_paper.pdf
+
+    :param value: A Tensor of shape [b, d0, d1, ..., dn, ch]
+    :return: A Tensor of shape [b, 2*d0, 2*d1, ..., 2*dn, ch]
+    """
+    with tf.name_scope(name) as scope:
+        sh = value.get_shape().as_list()
+        dim = len(sh[1:-1])
+        out = (tf.reshape(value, [-1] + sh[-dim:]))
+        for i in range(dim, 0, -1):
+            out = tf.concat(i, [out, out])
+        out_size = [-1] + [s * 2 for s in sh[1:-1]] + [sh[-1]]
+        out = tf.reshape(out, out_size, name=scope)
+    return out
+
 def display():
     print "displaying"
-    inputImage = batch["data"][54]
-    inputLabel = np.zeros((1,10))
-    inputLabel[np.arange(1),batch["labels"][54]] = 1;
+
+    batchsizeFeatures = 50
+    imageIndex = 56
+
+    inputImage = batch["data"][imageIndex:imageIndex+batchsizeFeatures]
+    # print inputImage
+    # inputImage = inputImage/255.0
+    inputLabel = np.zeros((batchsize,10))
+    inputLabel[np.arange(1),batch["labels"][imageIndex:imageIndex+batchsizeFeatures]] = 1;
     # inputLabel = batch["labels"][54]
+
+
+    # prints a given image
+
+
+    # saves pixel-representations of features from Conv layer 1
+    featuresReLu1 = tf.placeholder("float",[None,32,32,32])
+    unReLu = tf.nn.relu(featuresReLu1)
+    unBias = unReLu
+    unConv = tf.nn.conv2d_transpose(unBias, wConv1, output_shape=[batchsizeFeatures,imagesize,imagesize,colors] , strides=[1,1,1,1], padding="SAME")
+    activations1 = relu1.eval(feed_dict={img: inputImage, lbl: inputLabel, keepProb: 1.0})
+    print np.shape(activations1)
+
+    # display features
+    for i in xrange(32):
+        isolated = activations1.copy()
+        isolated[:,:,:,:i] = 0
+        isolated[:,:,:,i+1:] = 0
+        pixelactive = unConv.eval(feed_dict={featuresReLu1: isolated})
+        totals = np.sum(pixelactive,axis=(1,2,3))
+        best = np.argmax(totals,axis=0)
+        # best = 0
+        imsave("activ"+str(i)+".png",pixelactive[best])
+        saveImage(inputImage[best],"activ"+str(i)+"-base.png")
+
+    # display same feature for many images
+    for i in xrange(batchsizeFeatures):
+        isolated = activations1.copy()
+        isolated[:,:,:,:6] = 0
+        isolated[:,:,:,7:] = 0
+        pixelactive = unConv.eval(feed_dict={featuresReLu1: isolated})
+        totals = np.sum(pixelactive,axis=(1,2,3))
+        best = np.argmax(totals,axis=0)
+        imsave("activ"+str(i)+".png",pixelactive[i])
+        saveImage(inputImage[i],"activ"+str(i)+"-base.png")
+
+
+
+    # saves pixel-representations of features from Conv layer 2
+    featuresReLu2 = tf.placeholder("float",[None,16,16,64])
+    unReLu2 = tf.nn.relu(featuresReLu2)
+    unBias2 = unReLu2 - bConv2
+    unConv2 = tf.nn.conv2d_transpose(unBias2, wConv2, output_shape=[batchsizeFeatures,imagesize/2,imagesize/2,32] , strides=[1,1,1,1], padding="SAME")
+    unPool = unpool(unConv2)
+    unReLu = tf.nn.relu(unPool)
+    unBias = unReLu
+    unConv = tf.nn.conv2d_transpose(unBias, wConv1, output_shape=[batchsizeFeatures,imagesize,imagesize,colors] , strides=[1,1,1,1], padding="SAME")
+    activations1 = relu2.eval(feed_dict={img: inputImage, lbl: inputLabel, keepProb: 1.0})
+    print np.shape(activations1)
+
+    # display features
+    for i in xrange(64):
+        isolated = activations1.copy()
+        isolated[:,:,:,:i] = 0
+        isolated[:,:,:,i+1:] = 0
+        pixelactive = unConv.eval(feed_dict={featuresReLu2: isolated})
+        totals = np.sum(pixelactive,axis=(1,2,3))
+        best = np.argmax(totals,axis=0)
+        # best = 0
+        imsave("activ"+str(i)+"-2.png",pixelactive[best])
+        saveImage(inputImage[best],"activ"+str(i)+"-2-base.png")
+
+
+    # display same feature for many images
+    for i in xrange(batchsizeFeatures):
+        isolated = activations1.copy()
+        isolated[:,:,:,:30] = 0
+        isolated[:,:,:,31:] = 0
+        pixelactive = unConv.eval(feed_dict={featuresReLu2: isolated})
+        totals = np.sum(pixelactive,axis=(1,2,3))
+        best = np.argmax(totals,axis=0)
+        # best = 0
+        imsave("activ"+str(i)+"-2.png",pixelactive[i])
+        saveImage(inputImage[i],"activ"+str(i)+"-2-base.png")
+
+
+
+def saveImage(inputImage, name):
     red = inputImage[:1024]
     green = inputImage[1024:2048]
     blue = inputImage[2048:]
@@ -133,13 +234,8 @@ def display():
     formatted[1] = np.reshape(green,[32,32])
     formatted[2] = np.reshape(blue,[32,32])
     final = np.swapaxes(formatted,0,2)/255;
-    print np.shape(final)
-    # plt.imshow(final, interpolation='nearest')
-    # plt.show()
-    # imsave("test.png",final)
-    print guesses.eval(feed_dict={img: inputImage.reshape(1,3072), lbl: inputLabel, keepProb: 1})
-
-
+    final = np.rot90(np.rot90(np.rot90(final)))
+    imsave(name,final)
 
 
 def main(argv=None):
