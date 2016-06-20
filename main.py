@@ -37,14 +37,13 @@ colors = 3;
 
 sess = tf.InteractiveSession()
 
-img = tf.placeholder("float",shape=[None,imagesize*imagesize*colors])
+img = tf.placeholder("float",shape=[None,imagesize,imagesize,colors])
 lbl = tf.placeholder("float",shape=[None,10])
-xImage = tf.reshape(img,[-1,imagesize,imagesize,colors])
 # for each 5x5 area, check for 32 features over 3 color channels
 wConv1 = initWeight([5,5,colors,32])
 bConv1 = initBias([32])
 # move the conv filter over the picture
-conv1 = conv2d(xImage,wConv1)
+conv1 = conv2d(img,wConv1)
 # adds bias
 bias1 = conv1 + bConv1
 # relu = max(0,x), adds nonlinearality
@@ -93,6 +92,8 @@ validationRawLabel = batch["labels"][555:batchsize+555]
 validationLabel = np.zeros((batchsize,10))
 validationLabel[np.arange(batchsize),validationRawLabel] = 1
 validationData = validationData/255.0
+validationData = np.reshape(validationData,[-1,3,32,32])
+validationData = np.swapaxes(validationData,1,3)
 
 saver = tf.train.Saver()
 saver.restore(sess, tf.train.latest_checkpoint(os.getcwd()+"/training/"))
@@ -107,6 +108,8 @@ def train():
         trainingLabel = np.zeros((batchsize,10))
         trainingLabel[np.arange(batchsize),rawlabel] = 1
         trainingData = trainingData/255.0
+        trainingData = np.reshape(trainingData,[-1,3,32,32])
+        trainingData = np.swapaxes(trainingData,1,3)
 
         if i%10 == 0:
             train_accuracy = accuracy.eval(feed_dict={
@@ -143,8 +146,10 @@ def display():
     imageIndex = 56
 
     inputImage = batch["data"][imageIndex:imageIndex+batchsizeFeatures]
-    # print inputImage
-    # inputImage = inputImage/255.0
+    inputImage = inputImage/255.0
+    inputImage = np.reshape(inputImage,[-1,3,32,32])
+    inputImage = np.swapaxes(inputImage,1,3)
+
     inputLabel = np.zeros((batchsize,10))
     inputLabel[np.arange(1),batch["labels"][imageIndex:imageIndex+batchsizeFeatures]] = 1;
     # inputLabel = batch["labels"][54]
@@ -166,30 +171,34 @@ def display():
         isolated = activations1.copy()
         isolated[:,:,:,:i] = 0
         isolated[:,:,:,i+1:] = 0
+        print np.shape(isolated)
+        totals = np.sum(isolated,axis=(1,2,3))
+        best = np.argmin(totals,axis=0)
+        print best
         pixelactive = unConv.eval(feed_dict={featuresReLu1: isolated})
-        totals = np.sum(pixelactive,axis=(1,2,3))
-        best = np.argmax(totals,axis=0)
+        # totals = np.sum(pixelactive,axis=(1,2,3))
+        # best = np.argmax(totals,axis=0)
         # best = 0
-        imsave("activ"+str(i)+".png",pixelactive[best])
+        saveImage(pixelactive[best],"activ"+str(i)+".png")
         saveImage(inputImage[best],"activ"+str(i)+"-base.png")
 
     # display same feature for many images
-    for i in xrange(batchsizeFeatures):
-        isolated = activations1.copy()
-        isolated[:,:,:,:6] = 0
-        isolated[:,:,:,7:] = 0
-        pixelactive = unConv.eval(feed_dict={featuresReLu1: isolated})
-        totals = np.sum(pixelactive,axis=(1,2,3))
-        best = np.argmax(totals,axis=0)
-        imsave("activ"+str(i)+".png",pixelactive[i])
-        saveImage(inputImage[i],"activ"+str(i)+"-base.png")
+    # for i in xrange(batchsizeFeatures):
+    #     isolated = activations1.copy()
+    #     isolated[:,:,:,:6] = 0
+    #     isolated[:,:,:,7:] = 0
+    #     pixelactive = unConv.eval(feed_dict={featuresReLu1: isolated})
+    #     totals = np.sum(pixelactive,axis=(1,2,3))
+    #     best = np.argmax(totals,axis=0)
+    #     saveImage(pixelactive[i],"activ"+str(i)+".png")
+    #     saveImage(inputImage[i],"activ"+str(i)+"-base.png")
 
 
 
     # saves pixel-representations of features from Conv layer 2
     featuresReLu2 = tf.placeholder("float",[None,16,16,64])
     unReLu2 = tf.nn.relu(featuresReLu2)
-    unBias2 = unReLu2 - bConv2
+    unBias2 = unReLu2
     unConv2 = tf.nn.conv2d_transpose(unBias2, wConv2, output_shape=[batchsizeFeatures,imagesize/2,imagesize/2,32] , strides=[1,1,1,1], padding="SAME")
     unPool = unpool(unConv2)
     unReLu = tf.nn.relu(unPool)
@@ -199,41 +208,42 @@ def display():
     print np.shape(activations1)
 
     # display features
-    for i in xrange(64):
-        isolated = activations1.copy()
-        isolated[:,:,:,:i] = 0
-        isolated[:,:,:,i+1:] = 0
-        pixelactive = unConv.eval(feed_dict={featuresReLu2: isolated})
-        totals = np.sum(pixelactive,axis=(1,2,3))
-        best = np.argmax(totals,axis=0)
-        # best = 0
-        imsave("activ"+str(i)+"-2.png",pixelactive[best])
-        saveImage(inputImage[best],"activ"+str(i)+"-2-base.png")
+    # for i in xrange(64):
+    #     isolated = activations1.copy()
+    #     isolated[:,:,:,:i] = 0
+    #     isolated[:,:,:,i+1:] = 0
+    #     pixelactive = unConv.eval(feed_dict={featuresReLu2: isolated})
+    #     # totals = np.sum(pixelactive,axis=(1,2,3))
+    #     # best = np.argmax(totals,axis=0)
+    #     best = 0
+    #     saveImage(pixelactive[best],"activ"+str(i)+".png")
+    #     saveImage(inputImage[best],"activ"+str(i)+"-base.png")
 
 
     # display same feature for many images
-    for i in xrange(batchsizeFeatures):
-        isolated = activations1.copy()
-        isolated[:,:,:,:30] = 0
-        isolated[:,:,:,31:] = 0
-        pixelactive = unConv.eval(feed_dict={featuresReLu2: isolated})
-        totals = np.sum(pixelactive,axis=(1,2,3))
-        best = np.argmax(totals,axis=0)
-        # best = 0
-        imsave("activ"+str(i)+"-2.png",pixelactive[i])
-        saveImage(inputImage[i],"activ"+str(i)+"-2-base.png")
+    # for i in xrange(batchsizeFeatures):
+    #     isolated = activations1.copy()
+    #     isolated[:,:,:,:8] = 0
+    #     isolated[:,:,:,9:] = 0
+    #     pixelactive = unConv.eval(feed_dict={featuresReLu2: isolated})
+    #     totals = np.sum(pixelactive,axis=(1,2,3))
+    #     # best = np.argmax(totals,axis=0)
+    #     # best = 0
+    #     saveImage(pixelactive[i],"activ"+str(i)+".png")
+    #     saveImage(inputImage[i],"activ"+str(i)+"-base.png")
 
 
 
 def saveImage(inputImage, name):
-    red = inputImage[:1024]
-    green = inputImage[1024:2048]
-    blue = inputImage[2048:]
-    formatted = np.zeros([3,32,32])
-    formatted[0] = np.reshape(red,[32,32])
-    formatted[1] = np.reshape(green,[32,32])
-    formatted[2] = np.reshape(blue,[32,32])
-    final = np.swapaxes(formatted,0,2)/255;
+    # red = inputImage[:1024]
+    # green = inputImage[1024:2048]
+    # blue = inputImage[2048:]
+    # formatted = np.zeros([3,32,32])
+    # formatted[0] = np.reshape(red,[32,32])
+    # formatted[1] = np.reshape(green,[32,32])
+    # formatted[2] = np.reshape(blue,[32,32])
+    # final = np.swapaxes(formatted,0,2)/255;
+    final = inputImage
     final = np.rot90(np.rot90(np.rot90(final)))
     imsave(name,final)
 
